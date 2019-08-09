@@ -1,3 +1,4 @@
+# Have to run the two lines below in the command line before running system.py
 # export PYTHONPATH=/global/project/projectdirs/cosmo/work/legacysurvey/dr8-garage/code/legacypipe/py:$PYTHONPATH
 # module load ds9/8.0.1
 
@@ -8,9 +9,8 @@ import numpy as np
 import os
 import sys
 import io
-        
-hdu = fits.open("OutliersList000t035.fits")
-#hdu = fits.open("OutliersList042.fits")
+
+hdu = fits.open("OutliersList000t035.fits") # OutlierAccess.py returns fits file for certain collection of bricks
 data = hdu[1].data
 pixels = data['Total pixels']
 bigPixels = []
@@ -48,7 +48,7 @@ name = int(input("Which would you like to choose: "))
 if name == 15:
 	camera = str(input("Camera: "))
 	exposure = int(input("Exposure #: "))
-	ccd = int(input("CCD #: "))
+	ccd = input("CCD # (If decam, put in letter and number): ")
 	print("Looking at: ", camera, exposure, ccd)
 else:
 	index = topTenIndexes[name]
@@ -56,14 +56,22 @@ else:
 	brickname = data["Brick"][index]
 	print("Looking at: ", data[index])
 	parts = information[0].split('-')
-	exposure = int(parts[1])
-	ccd = int(parts[2][-1])
 	camera = str(parts[0])	
+	exposure = int(parts[1])
+	if camera == "decam":
+		ccd = int(parts[2][1:])
+	else:
+		ccd = int(parts[2][-1])
 	
 os.chdir("/global/project/projectdirs/cosmo/work/legacysurvey/dr8")
 hdu = fits.open("survey-ccds-%s-dr8.fits.gz" % (camera))
 data = hdu[1].data
-ccdS = "CCD" + str(ccd)
+if camera == "decam":
+	ccdS = str(ccd)
+	ccdN = ccd[1:]
+else:
+	ccdS = "CCD" + str(ccd)
+	ccdN = ccd
 counter = 0
 surveyLength = hdu[1].header["NAXIS2"]
 for elem in range(0, surveyLength):
@@ -72,13 +80,6 @@ for elem in range(0, surveyLength):
 		ccdNumber = data[elem]["ccdname"]
 		if (exposureNumber == exposure) and (ccdNumber == ccdS):
 			info = data[elem]
-			ccdBRx = data[elem]["crval1"]
-			ccdBRy = data[elem]["crval2"]
-			ccdCx = data[elem]["ra"]
-			ccdCy = data[elem]["dec"]
-			ccdX = 2*(ccdCx-ccdBRx)
-			ccdY = 2*(ccdCy-ccdBRy)
-			#print("CCD Size: ", ccdX, ", ", ccdY) not right?
 			filePD = data[elem]["image_filename"]
 			info = filePD.split("/")
 			date = info[2]
@@ -88,10 +89,7 @@ for elem in range(0, surveyLength):
 	except IndexError:
 		print("Not found!")
 		sys.exit()
-
-#print("\npython /global/project/projectdirs/cosmo/work/legacysurvey/dr8-garage/code/legacypipe/py/legacypipe/queue-calibs.py --ccds /global/project/projectdirs/cosmo/work/legacysurvey/dr8-garage/zpts/%s/%s/%s-survey.fits --touching" % (camera, date, filenameCut))
-#fn = "mosaic/CP20170210/k4m_170211_030552_ooi_zd_v1-survey.fits" # Generate from file
-
+		
 fn = "%s/%s/%s-survey.fits" % (camera, date, filenameCut)
 dir = "/global/project/projectdirs/cosmo/work/legacysurvey/dr8-garage/zpts/%s" % fn
 
@@ -120,7 +118,7 @@ indexes = []
 imdir = "/global/project/projectdirs/cosmo/work/legacysurvey/dr8-garage/zpts/%s" % (fn)
 hdu = fits.open(imdir)
 data = hdu[1].data
-for x in range(0, 5):
+for x in range(0, 100):
 	try:
 		ccdHere = data[x]['ccdname']
 		if str(ccdHere) == str(ccdS):
@@ -151,7 +149,6 @@ elif camera == "decam":
 	ytl = dat[i]['dec1']
 	xbr = dat[i]['ra3']
 	ybr = dat[i]['dec3']
-	print(xtl,ytl,xbr,ybr)
 
 hduBricks = fits.open("survey-bricks.fits.gz")
 brickData = hduBricks[1].data
@@ -164,10 +161,8 @@ for x in range(0, len(bricks)):
 			data = brickData[index]
 			raL = data['RA1']
 			raU = data['RA2']
-			raRange = [raL, raU]
 			decL = data['DEC1']
 			decU = data['DEC2']
-			decRange = [decL, decU]
 			if (xbr < raU) and (xbr > raL):
 				if (ybr < decU) and (ybr > decL):
 					bR = data['BRICKNAME']
@@ -192,148 +187,15 @@ vertical = np.abs(decTL-decBR)
 if tL[0][4] != bR[0][4]:
 	signTL = tL[0][4]
 	signBR = bR[0][4]
-	#print(tL[0][4:8])
 	if tL[0][4:8] == "p002":
 		vertical = 5
 
 tR = str(bR[0][0:4])+str(tL[0][4:8])
 bL = str(tL[0][0:4])+str(bR[0][4:8])
 
-print("Top right corner: ", tR)
-print("Bottom left corner: ", bL)
-print("!!! ", exposure, ccd)
+#print("Top right corner: ", tR)
+#print("Bottom left corner: ", bL)
 
-"""
-if (vertical == 5):
-	if (horizontal == 2) or (horizontal == 3):
-		mL2 = str(tL[0][0:5])+"0"+str(np.abs(decTL-2))
-		mL3 = str(tL[0][0:5])+"0"+str(np.abs(decTL-3))
-		mR2 = str(bR[0][0:5])+"0"+str(np.abs(decTL-2))
-		mR3 = str(bR[0][0:5])+"0"+str(np.abs(decTL-3))
-		if tL[0][4:8] == "p002":
-			mL2 = str(tL[0][0:4])+"p000"
-			mR2 = str(bR[0][0:4])+"p000"
-		if tL[0][4:8] == "p000":
-			mL2 = str(tL[0][0:4])+"m002"
-			mR2 = str(bR[0][0:4])+"m002"
-		if mL2 in bricks:
-			mL = mL2
-		else:
-			mL = mL3
-		if mR2 in bricks:
-			mR = mR2
-		else:
-			mR = mR3
-		touchingBricks = [str(bR[0]), mR, tR, bL, mL, str(tL[0])]
-		for x in range(0, len(touchingBricks)):
-			if len(str(touchingBricks[x])) != 8:
-				if len(touchingBricks[x][5:8]) != 3:
-					zeroDECa = touchingBricks[x]+"0"
-					zeroDECb = touchingBricks[x][0:5]+"0"+touchingBricks[x][-2:]
-					#print(zeroDECb)
-					if zeroDECb[-4:] == "m003":
-						zeroDECb2 = touchingBricks[x][0:4]+"m002"
-					if zeroDECb[-4:] == "p003":
-						zeroDECb2 = touchingBricks[x][0:4]+"p002"
-					if zeroDECa in bricks:
-						touchingBricks[x] = zeroDECa
-					elif zeroDECb in bricks:
-						touchingBricks[x] = zeroDECb
-					elif zeroDECb2 in bricks:
-						touchingBricks[x] = zeroDECb2
-				if len(touchingBricks[x][0:4]) != 4:
-					zeroRAb = "0"+touchingBricks[x] 
-					zeroRAa = touchingBricks[0:3]+"0"
-		print(touchingBricks)
-		#print("CCD Covers 6 bricks!")
-	if (horizontal == 5):
-		tM2 = "0"+str(raTL-2)+str(tL[0][4:8])
-		tM3 = "0"+str(raTL-3)+str(tL[0][4:8])
-		mL2 = str(tL[0][0:5])+"0"+str(np.abs(decTL-2))
-		mL3 = str(tL[0][0:5])+"0"+str(np.abs(decTL-3))
-		mM22 = "0"+str(raTL-2)+str(tL[0][4])+"0"+str(np.abs(decTL-2))
-		mM23 = "0"+str(raTL-2)+str(tL[0][4])+"0"+str(np.abs(decTL-3))
-		mM32 = "0"+str(raTL-3)+str(tL[0][4])+"0"+str(np.abs(decTL-2))
-		mM33 = "0"+str(raTL-3)+str(tL[0][4])+"0"+str(np.abs(decTL-3))
-		mR2 = str(bR[0][0:5])+"0"+str(np.abs(decTL-2))
-		mR3 = str(bR[0][0:5])+"0"+str(np.abs(decTL-3))
-		bM2 = "0"+str(raTL-2)+str(bR[0][4:8])
-		bM3 = "0"+str(raTL-3)+str(bR[0][4:8])
-		if tL[0][4:8] == "p002":
-			mM22 = "0"+str(raTL-2)+"p000"
-			mM32 = "0"+str(raTL-3)+"p000"
-			mR2 = str(bR[0][0:4])+"p000"
-			mL2 = str(tL[0][0:4])+"p000"
-		if decTL != 3:
-			mM22 = mM22[0:5]+"0"+mM22[5:]
-			mM23 = mM23[0:5]+"0"+mM23[5:]
-			mM32 = mM32[0:5]+"0"+mM32[5:]
-			mM33 = mM33[0:5]+"0"+mM33[5:]
-		if tM2 in bricks:
-			tM = tM2
-		else:
-			tM = tM3
-		if mL2 in bricks:
-			mL = mL2
-		else:
-			mL = mL3
-		if mR2 in bricks:
-			mR = mR2
-		else:
-			mR = mR3
-		if mM22 in bricks:
-			mM = mM22
-		elif mM23 in bricks:
-			mM = mM23
-		elif mM32 in bricks:
-			mM = mM32
-		elif mM33 in bricks:
-			mM = mM33
-		if bM2 in bricks:
-			bM = bM2
-		elif bM3 in bricks:
-			bM = bM3
-		touchingBricks = [str(bR[0]), mR, tR, bM, mM, tM, bL, mL, str(tL[0])]
-		for x in range(0, len(touchingBricks)):
-			if len(str(touchingBricks[x])) != 8:
-				if len(touchingBricks[x][5:8]) != 3:
-					zeroDECa = touchingBricks[x]+"0"
-					zeroDECb = touchingBricks[x][0:5]+"0"+touchingBricks[x][-2:]
-					if zeroDECa in bricks:
-						touchingBricks[x] = zeroDECa
-					elif zeroDECb in bricks:
-						touchingBricks[x] = zeroDECb
-				if len(touchingBricks[x][0:4]) != 4:
-					zeroRAb = "0"+touchingBricks[x] 
-					zeroRAa = touchingBricks[0:3]+"0"
-		#print(touchingBricks)
-		#print("CCD Covers 9 Bricks!")
-	
-elif (vertical == 2) or (vertical == 3):
-	if (horizontal == 2) or (horizontal == 3): ## GOOD
-		touchingBricks = [str(bR[0]), tR, bL, str(tL[0])]
-		#print(touchingBricks)
-		#print("CCD Covers 4 bricks!")
-	elif horizontal == 5:
-		tM2 = "0"+str(raTL-2)+tL[0][4:]
-		tM3 = "0"+str(raTL-3)+tL[0][4:]
-		bM2 = "0"+str(raTL-2)+bR[0][4:]
-		bM3 = "0"+str(raTL-3)+bR[0][4:]
-		if raTL != 3:
-			tM2 = "0"+tM2
-			tM3
-		print(bM2, bM3, tM2,tM3)
-		if tM2 in bricks:
-			tM = tM2
-		elif tM3 in bricks:
-			tM = tM3
-		if bM2 in bricks:
-			bM = bM2
-		elif bM3 in bricks:
-			bM = bM3
-		touchingBricks = [str(bR[0]), tR, bM, tM, bL, str(tL[0])]
-		print(touchingBricks)
-"""
 def brick2coords(brickname):
     ra = 0.1*float(brickname[0:4])
     dec = 0.1*float(brickname[5:8])
@@ -353,23 +215,23 @@ for b in bricks:
 	if ( (ra1 <= ra) and (ra <= ra3) and (dec1 <= dec) and (dec <= dec2) ):
 		tmpBricks.append( (ra, dec, b) )
 		okBricks.append(b)
-#from operator import itemgetter
 tmpBricks.sort()
 
 if len(okBricks) == 9:
 	touchingBricks = okBricks
 	touchingBricks.sort(reverse=True)
-	#print("!!!", touchingBricks)
 else:
 	for b in tmpBricks:
 		touchingBricks.append(b[2])
-
+if camera == "decam":
+	location = "south"
+else:
+	location = "north"
 for x in range(0, len(touchingBricks)):
 	b3 = touchingBricks[x][0:3]
-	dir = "/global/project/projectdirs/cosmo/work/legacysurvey/dr8/north/metrics/%s/" % b3
+	dir = "/global/project/projectdirs/cosmo/work/legacysurvey/dr8/%s/metrics/%s/" % (location, b3)
 	os.chdir(dir)
 	hdu = fits.open("outlier-mask-%s.fits.fz" % touchingBricks[x])
-	#print(dir+"outlier-mask-%s.fits.fz" % touchingBricks[x])
 	for elem in range(1, 64):
 		try:
 			list = hdu[elem].data
@@ -377,8 +239,11 @@ for x in range(0, len(touchingBricks)):
 			parts = extName.split('-')
 			camera = parts[0]
 			expnum = int(parts[1])
-			ccdNumb = int(parts[2][-1])
-			if (expnum == exposure) and (ccdNumb == ccd):	# confirms this brick has same ccd exposure as parsed
+			if camera == "decam":
+				ccdNumb = int(parts[2][1:])
+			else:
+				ccdNumb = int(parts[2][-1])
+			if (int(expnum) == int(exposure)) and (int(ccdNumb) == int(ccdN)):	# confirms this brick has same ccd exposure as parsed
 				extensions.append(extName)
 				indexes.append(elem)
 				break
@@ -393,9 +258,8 @@ ys = []
 for x in range(0, len(touchingBricks)):
 	try:
 		b3 = touchingBricks[x][0:3]
-		os.chdir("/global/project/projectdirs/cosmo/work/legacysurvey/dr8/north/metrics/%s" % b3)
+		os.chdir("/global/project/projectdirs/cosmo/work/legacysurvey/dr8/%s/metrics/%s" % (location, b3))
 		hdu = fits.open("outlier-mask-%s.fits.fz" % touchingBricks[x])
-		#print(touchingBricks[x])
 		data = hdu[indexes[x]].data
 		dataCorners.append(data)
 		x0, y0 = data.shape
@@ -403,7 +267,7 @@ for x in range(0, len(touchingBricks)):
 		ys.append(y0)
 	except IndexError:
 		break
-
+		
 if len(touchingBricks) == 4:
 	nx1 = xs[0] + xs[2]
 	nx2 = xs[1] + xs[3]
@@ -426,7 +290,6 @@ if len(touchingBricks) == 4:
 	A[xs[1]:nx2, ys[2]:ny2] = dataCorners[3]
 	print(touchingBricks[3], touchingBricks[1])
 	print(touchingBricks[2], touchingBricks[0])
-	print(exposure, ccd)
 	
 elif len(touchingBricks) == 6:
 	if vertical == 5:
@@ -464,6 +327,7 @@ elif len(touchingBricks) == 6:
 		print(touchingBricks[5], touchingBricks[2])
 		print(touchingBricks[4], touchingBricks[1])
 		print(touchingBricks[3], touchingBricks[0])
+		
 	elif (vertical == 2) or (vertical == 3):
 		nx11 = xs[0]+xs[2]
 		nx12 = xs[0]+xs[2]+xs[4]
@@ -494,11 +358,9 @@ elif len(touchingBricks) == 6:
 		A[xs[1]:nx21, ys[2]:ny2] = dataCorners[3]
 		A[nx11:nx12, 0:ys[4]] = dataCorners[4]
 		A[nx21:nx22, ys[4]:ny3] = dataCorners[5]
-		"""
+
 		print(touchingBricks[5], touchingBricks[3], touchingBricks[1])
 		print(touchingBricks[4], touchingBricks[2], touchingBricks[0])
-		print(exposure, ccd)
-		"""
 	
 elif len(touchingBricks) == 9:
 	nx11 = xs[0]+xs[3]
@@ -547,12 +409,10 @@ elif len(touchingBricks) == 9:
 	A[nx21:nx22, ys[6]:ny31] = dataCorners[7] # middle left
 	A[nx31:nx32, ny31:ny32] = dataCorners[8] # top left
 	
-	"""
-	print(touchingBricks[8], touchingBricks[5], touchingBricks[2])
-	print(touchingBricks[7], touchingBricks[4], touchingBricks[1])
-	print(touchingBricks[6], touchingBricks[3], touchingBricks[0])
-	print(exposure, ccd)
-	"""
+	print(touchingBricks[0], touchingBricks[3], touchingBricks[6])
+	print(touchingBricks[1], touchingBricks[4], touchingBricks[7])
+	print(touchingBricks[2], touchingBricks[5], touchingBricks[8])
+
 header = fits.Header()
 outlierDir = "/global/homes/k/kdevries/outliers"
 os.chdir(outlierDir)
