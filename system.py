@@ -145,8 +145,7 @@ elif camera == "90prime":
 	ytl = dat[i]['dec0']
 	xbr = dat[i]['ra2']
 	ybr = dat[i]['dec2']
-	#print(xtl, ytl)
-	#print(xbr, ybr)
+
 elif camera == "decam":
 	xtl = dat[i]['ra1']
 	ytl = dat[i]['dec1']
@@ -342,72 +341,28 @@ def brick2coords(brickname):
     	dec *= -1.0
     return ra, dec
     
-# ra1 = ra2, dec1 = dec3
-# ra3 = ra4, dec2 = dec4
 ra1, dec1 = brick2coords(bR[0])
 ra2, dec2 = brick2coords(tR)
 ra3, dec3 = brick2coords(bL)
 ra4, dec4 = brick2coords(tL[0])
 # Need to add check for wraparound at ra = 360deg.
 tmpBricks = []
+okBricks = touchingBricks.copy()
 for b in bricks:
 	ra, dec = brick2coords(b)
 	if ( (ra1 <= ra) and (ra <= ra3) and (dec1 <= dec) and (dec <= dec2) ):
 		tmpBricks.append( (ra, dec, b) )
+		okBricks.append(b)
 #from operator import itemgetter
 tmpBricks.sort()
 
-for b in tmpBricks:
-	touchingBricks.append(b[2])
-
-"""
-brickCopy = touchingBricks.copy()
-raUpper = tL[0][0:4]
-raLower = bR[0][0:4]
-decUpper = tL[0][5:8]
-decLower = bR[0][5:8]
-bricks1 = []
-bricks2 = []
-
-for x in range(0, len(touchingBricks)):
-	if touchingBricks[x][0:4] == raUpper:
-		bricks1.append(touchingBricks[x])
-		brickCopy.remove(touchingBricks[x])
-	elif touchingBricks[x][0:4] == raLower:
-		bricks2.append(touchingBricks[x])
-		brickCopy.remove(touchingBricks[x])
-
-if (tL[0][4] == "m") and (bR[0][4] == "m"):
-		bricks1.sort(reverse=True)
-		bricks2.sort(reverse=True)
-		brickCopy(reverse=True)
-		print("here!")
-
-print(bricks1)
-bricks1.sort(reverse=True)
-print(bricks1, bricks2)
-print(brickCopy)
-
-if len(touchingBricks) == 9:
-	bricks3 = []
-	raMiddle = brickCopy[0][0:4]
-	print(raMiddle)
-	
-	#touchingBricks9 = [bR, mR, tR, bM, mM, tM, bL, mL, tL]
-	
-if len(touchingBricks) == 6:
-	if horizontal == 5:
-		#touchingBricks62= [bR, tR, bM, tM, bL, tL]
-		print("5")
-		
-	elif vertical == 5:
-		#touchingBricks6 = [bR, mR, tR, bL, mL, tL]
-		print("Also 5")
-if len(touchingBricks) == 4:
-	bricks = [str(bR[0]), tR, bL, str(tL[0])]
-
-#print(touchingBricks)
-"""
+if len(okBricks) == 9:
+	touchingBricks = okBricks
+	touchingBricks.sort(reverse=True)
+	#print("!!!", touchingBricks)
+else:
+	for b in tmpBricks:
+		touchingBricks.append(b[2])
 
 for x in range(0, len(touchingBricks)):
 	b3 = touchingBricks[x][0:3]
@@ -440,7 +395,7 @@ for x in range(0, len(touchingBricks)):
 		b3 = touchingBricks[x][0:3]
 		os.chdir("/global/project/projectdirs/cosmo/work/legacysurvey/dr8/north/metrics/%s" % b3)
 		hdu = fits.open("outlier-mask-%s.fits.fz" % touchingBricks[x])
-		print(touchingBricks[x])
+		#print(touchingBricks[x])
 		data = hdu[indexes[x]].data
 		dataCorners.append(data)
 		x0, y0 = data.shape
@@ -539,14 +494,13 @@ elif len(touchingBricks) == 6:
 		A[xs[1]:nx21, ys[2]:ny2] = dataCorners[3]
 		A[nx11:nx12, 0:ys[4]] = dataCorners[4]
 		A[nx21:nx22, ys[4]:ny3] = dataCorners[5]
+		"""
 		print(touchingBricks[5], touchingBricks[3], touchingBricks[1])
 		print(touchingBricks[4], touchingBricks[2], touchingBricks[0])
 		print(exposure, ccd)
+		"""
 	
 elif len(touchingBricks) == 9:
-	# touchingBricks = [str(bR[0], mR, tR, bM, mM, tM, bL, mL, str(tL[0])
-	print("!!!", xs, ys)
-	print(touchingBricks)
 	nx11 = xs[0]+xs[3]
 	nx21 = xs[1]+xs[4]
 	nx31 = xs[2]+xs[5]
@@ -559,6 +513,7 @@ elif len(touchingBricks) == 9:
 	ny12 = ys[0]+ys[1]+ys[2]
 	ny22 = ys[3]+ys[4]+ys[5]
 	ny32 = ys[6]+ys[7]+ys[8]
+	
 	if nx12 > nx22:
 		if nx12 > nx32:
 			nx = nx12
@@ -581,33 +536,23 @@ elif len(touchingBricks) == 9:
 			ny = ny32
 			
 	A = np.zeros([nx,ny])
+	
 	A[0:xs[0], 0:ys[0]] = dataCorners[0] # Bottom right
-	#[0:1238, 0:1136]
 	A[0:xs[1], ys[0]:ny11] = dataCorners[1] # Middle right
-	#[0:1237, 1136:3234]
 	A[0:xs[2], ny11:ny12] = dataCorners[2] # Top right
-	#[0:1229, 3234:4229]
 	A[xs[0]:nx11, 0:ys[3]] = dataCorners[3] # bottom middle
-	#[1238:3328, 0:1153]
 	A[xs[1]:nx21, ys[3]:ny21] = dataCorners[4] # middle middle
-	#[1237:3329, 1153:3252]
 	A[xs[2]:nx31, ny21:ny22] = dataCorners[5] # top middle
-	#[1229:3317, 3252:4238]
-	
 	A[nx11:nx12, 0:ys[6]] = dataCorners[6] # bottom left
-	#[3328:4299, 0:1158]
-	
 	A[nx21:nx22, ys[6]:ny31] = dataCorners[7] # middle left
-	#[3329:4310, 1158:3245]
-	
 	A[nx31:nx32, ny31:ny32] = dataCorners[8] # top left
-	#[3317:4303, 3245:4218]
-
+	
+	"""
 	print(touchingBricks[8], touchingBricks[5], touchingBricks[2])
 	print(touchingBricks[7], touchingBricks[4], touchingBricks[1])
 	print(touchingBricks[6], touchingBricks[3], touchingBricks[0])
 	print(exposure, ccd)
-	
+	"""
 header = fits.Header()
 outlierDir = "/global/homes/k/kdevries/outliers"
 os.chdir(outlierDir)
